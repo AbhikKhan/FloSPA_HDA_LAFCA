@@ -4,8 +4,8 @@ NodeList = {}
 
 class Node:
     def __init__(self, label):
-        self.label = label
-        self.children = []
+        self.label = label # M1 or R1
+        self.children = [] #[[node1, weight1], [node2, weight2]]
         
     def addChild(self, child, weight):
         self.children.append([child, weight])
@@ -65,16 +65,25 @@ def getRoot(file):
         treeNode = Node(nodeLabels[node])
         NodeList[int(node)] = treeNode
 
+    # Adding child of a node
     for (u, v) in edgeList:
-        NodeList[int(u)].addChild(NodeList[int(v)], edgeList[(u, v)])
+        NodeList[int(u)].addChild(NodeList[int(v)], edgeList[(u, v)]) # name and weight
     
+    # Get the rootlist that we need to create a tree using NTM listtotree
     startNode = 1
     root = [4]
     root.extend(getList(NodeList[startNode]))
+    
+    # Getting all the reagent information of mixing nodes
+    mixers = {}
+    for node in NodeList:
+        if NodeList[node].label[0] == 'M':
+            mixers[NodeList[node].label] = [[child.label]*weight for (child, weight) in NodeList[node].children]  
+    
     NodeList.clear()
-    return root
+    return root, mixers
 
 if __name__ == "__main__":
     file = "skeletonTreeAfterAnnotation.dot"
-    root = getRoot(file)
+    root, mixers = getRoot(file)
     print(root)

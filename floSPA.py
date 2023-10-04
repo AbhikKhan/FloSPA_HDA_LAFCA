@@ -419,7 +419,8 @@ def floSPA(root, ratioList, factorList, name):
     subprocess.check_call(['dot', '-Tpng', 'skeletonTreeAfterAnnotation.dot', '-o', name])
     
     # create tree from the dot file and use NTM to get placement information
-    newroot = PT.getRoot("skeletonTreeAfterAnnotation.dot")
+    newroot, mixers = PT.getRoot("skeletonTreeAfterAnnotation.dot")
+    print(mixers)
     ntmroot = listToTree(newroot)
     output_assignment_set = ntm(ntmroot, [5, 5], [1]) # returns [moduleID, timeStamp, Binding, WashSequence] for every sequence
 
