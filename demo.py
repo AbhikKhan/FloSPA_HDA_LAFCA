@@ -86,9 +86,9 @@ def ntmDemo(output_tree):
 def main():
     nodeCreationDemo()
     root = listToTreeDemo()
-    # root = genmixDemo()
-    # tree = hdaDemo(root)
-    # bfs(tree)
+    root = genmixDemo()
+    tree = hdaDemo(root)
+    bfs(tree)
     assignment = ntmDemo(root)
 
     for key in assignment:

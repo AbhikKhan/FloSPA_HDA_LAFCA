@@ -1,5 +1,7 @@
 import subprocess
 import networkx as nx
+from collections import deque
+
 import PathWayTree as PWT
 from showImages import *
 
@@ -394,35 +396,43 @@ def getName(ratioList):
     return name[:-1]
 
 
-def floSPA(root, ratioList, factorList, name):
-    G = PWT.createSkeletonTreeNew(root)
-    PWT.putIndexInSkeletonTree(G)
-    PWT.putHeightInSkeletonTree(G)
-    PWT.printTreeAfterAdding_lih(G,"skeletonTreeAfterAdding_lih.dot")
-    #----------------------------------------------------------
+def getMix(root):
+    '''
+        Returns a dictionary that contains all the mixtures and their ratio list
+        Simple BFS will work
+    '''
+    queue = deque()
+    queue.append(root)
+    mixture = dict()
 
-    annotatePathWayTree(G, ratioList)
-    opFile = open('z3clauses.py','w')
-    initOPT(opFile)
-    addvariables(G,opFile)
-    ratioConsistencyConstraintsWithLinerarization(G, opFile, factorList, ratioList)
+    while queue:
+        s = len(queue)
+        nodes = []
+        while s:
+            s -= 1
+            node = queue.popleft()
+            reags = []
+            nodes += [child for child in node.children if child.children != []]
+            for child in node.children:
+                reags.extend([child.value]*child.volume)
+            mixture[node.value] = reags
 
-    mixerConsistencyConstraints(G,opFile)
-    nonNegativityConstraints(G,opFile)
-    if name[-5] == '1':
-        limitEdges(opFile)
-    setTarget(G,opFile,ratioList)
-    finishOPT(G,opFile)
-    subprocess.call(["python3","z3clauses.py"])
-    annotateMixingTreeWithValue(G,'z3opFile')
-    printTreeAfterAnnotation(G, 'skeletonTreeAfterAnnotation.dot')
-    subprocess.check_call(['dot', '-Tpng', 'skeletonTreeAfterAnnotation.dot', '-o', name])
-    
-    # create tree from the dot file and use NTM to get placement information
-    newroot, mixers = PT.getRoot("skeletonTreeAfterAnnotation.dot")
-    print(mixers)
-    ntmroot = listToTree(newroot)
+        for n in nodes:
+            queue.append(n)
+    return mixture
+
+
+def getPlacementAndTimestamp(root):
+    '''
+        Generate the tree from the list provided
+        Use NTM to get the placement of the tree and time stamp at which each mixture will execute
+    '''
+    ntmroot = listToTree(root)
     output_assignment_set = ntm(ntmroot, [5, 5], [1]) # returns [moduleID, timeStamp, Binding, WashSequence] for every sequence
+
+    # Get the corrospondence mixture reagents and intermediate fluids
+    mixture = getMix(ntmroot)
+    print(mixture)
 
     # Assignment of all the internal node in biochip
     assignment = {}
@@ -441,8 +451,39 @@ def floSPA(root, ratioList, factorList, name):
     for t in timeStamp:
         print(t, timeStamp[t])
 
+
+def floSPA(root, ratioList, factorList, name):
+    '''
+        Use floSPA to generate the mixing tree.
+    '''
+    # Create skeleton tree
+    G = PWT.createSkeletonTreeNew(root)
+    PWT.putIndexInSkeletonTree(G)
+    PWT.putHeightInSkeletonTree(G)
+    PWT.printTreeAfterAdding_lih(G,"skeletonTreeAfterAdding_lih.dot")
+    
+    # Add floSPA constraints
+    annotatePathWayTree(G, ratioList)
+    opFile = open('z3clauses.py','w')
+    initOPT(opFile)
+    addvariables(G,opFile)
+    ratioConsistencyConstraintsWithLinerarization(G, opFile, factorList, ratioList)
+
+    mixerConsistencyConstraints(G,opFile)
+    nonNegativityConstraints(G,opFile)
+    if name[-5] == '1':
+        limitEdges(opFile)
+    setTarget(G,opFile,ratioList)
+    finishOPT(G,opFile)
+    subprocess.call(["python3","z3clauses.py"])
+    annotateMixingTreeWithValue(G,'z3opFile')
+    printTreeAfterAnnotation(G, 'skeletonTreeAfterAnnotation.dot')
+    subprocess.check_call(['dot', '-Tpng', 'skeletonTreeAfterAnnotation.dot', '-o', name])
     moreThanOneChild.clear()
 
+    # create tree from the dot file
+    newroot = PT.getRoot("skeletonTreeAfterAnnotation.dot")
+    getPlacementAndTimestamp(newroot)
 
 def skeletonTreeGeneration(ratioList, factorList):
 

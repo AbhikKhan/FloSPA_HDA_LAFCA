@@ -74,16 +74,11 @@ def getRoot(file):
     root = [4]
     root.extend(getList(NodeList[startNode]))
     
-    # Getting all the reagent information of mixing nodes
-    mixers = {}
-    for node in NodeList:
-        if NodeList[node].label[0] == 'M':
-            mixers[NodeList[node].label] = [[child.label]*weight for (child, weight) in NodeList[node].children]  
-    
+    # Getting all the reagent information of mixing node
     NodeList.clear()
-    return root, mixers
+    return root
 
 if __name__ == "__main__":
     file = "skeletonTreeAfterAnnotation.dot"
-    root, mixers = getRoot(file)
+    root = getRoot(file)
     print(root)
