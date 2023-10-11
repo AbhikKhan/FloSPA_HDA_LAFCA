@@ -421,6 +421,18 @@ def getMix(root):
             queue.append(n)
     return mixture
 
+def boundingbox(assignments):
+    x_max, y_max, x_min, y_min = 0, 0, 15, 15
+    for mix in assignments:
+        for cell in assignments[mix]:
+            x_max = max(x_max, cell[0])
+            x_min = min(x_min, cell[0])
+            y_max = max(y_max, cell[1])
+            y_min = min(y_min, cell[1])
+    
+    area = (x_max - x_min + 1) * (y_max - y_min + 1)
+    return area
+            
 
 def KBL(mixtures, assignment, timestamp):
     '''
@@ -528,6 +540,7 @@ def getPlacementAndTimestamp(root):
             else:
                 timeStamp[item[1]].append(item[0])
 
+    print("area ", boundingbox(assignment))
     # for key in assignment:
     #     print(key, assignment[key])
     # for t in timeStamp:
