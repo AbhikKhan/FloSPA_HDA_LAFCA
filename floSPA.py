@@ -383,7 +383,7 @@ def printTreeAfterAnnotation(G,filename):
 def getInputRatio(ratioList):
     input_ratio = []
     for i, ratio in enumerate(ratioList):
-        input_ratio.append((f'r{i}', ratio))
+        input_ratio.append((f'R{i}', ratio))
     
     return input_ratio
 
@@ -422,6 +422,88 @@ def getMix(root):
     return mixture
 
 
+def KBL(mixtures, assignment, timestamp):
+    '''
+        Returns KBL information of a mixing tree
+    '''
+    # Get the parallel loading cells in each time stamp
+    for t in timestamp:
+        parallelLoading = timestamp[t][:]
+        loadingCells = []
+        reagentList = []
+        blockageList = []
+        units = []
+        for mix in parallelLoading: # Mi Mj etc
+            loadingCells.append(assignment[mix])
+            reagentList.append(mixtures[mix])
+            
+            blockage = dict() # Store blockage list for each mixture Mi
+            unit = dict() # Store units of intermediate fluids required
+            for reagent in mixtures[mix]:
+                if reagent[0] == 'M': # indicates intermediate fluid (blockage)
+                    if reagent not in blockage:
+                        blockage[reagent] = []
+                        unit[reagent] = 1
+                        for cell in assignment[mix]:
+                            if cell in assignment[reagent]:
+                                blockage[reagent].append(cell)
+                    else:
+                        unit[reagent] += 1
+            blockageList.append(blockage)
+            units.append(unit)
+
+        print(loadingCells)
+        print(blockageList)
+        print(reagentList)
+        loadingPaths = getPlacementAndLoading(loadingCells, blockageList, reagentList, units)
+        print(loadingPaths)
+    """
+        allFlow, allBendings, allLengths = 0, 0, 0
+        for parallelMixtures in rs:
+            parallelLoadingCells = []
+            reagents = []
+            blockageList = [] # stores all the blockages and the coordinates in which they can be placed.
+            '''
+                As only one unit is being shared between parent and child so there is no need to keep track of
+                number of same blockages as only one blockage of a particular kind will be taken into consideration.
+            '''
+
+            for mix in parallelMixtures:
+                mixture = [[element - 1 for element in sublist] for sublist in coordinates[mix][:]]
+                parallelLoadingCells.append(mixture[:])
+
+                # Child information to place blockages
+                blockages = dict()
+                if mix in adj_list:
+                    for child in adj_list[mix]:
+                        for cell in coordinates[child]:
+                            if cell in coordinates[mix]:
+                                interFluid = 'M'+str(child)
+                                if interFluid not in blockages: # Check wheather the blockage is present in the list or not
+                                    blockages[interFluid] = [[x-1 for x in cell]]
+                                else:
+                                    blockages[interFluid].append([x-1 for x in cell])
+                    blockageList.append(blockages)
+
+                # Get all the reagents for the current mixture
+                reagents.append(mix_u[mix])
+
+            totalPathLength, totalBendings = 0, 0
+            loadingPaths = lafca.getPlacementAndLoading(parallelLoadingCells, blockageList, reagents)
+            for order in loadingPaths:
+                totalBendings += order[1]
+                totalPathLength += len(order[2])
+                print(order[0], 'Bendings:', order[1], 'Path Length:', len(order[2]))
+            
+            print('Flow:', len(loadingPaths), ',Total Bendings:', totalBendings, ',Total Path Length:', totalPathLength)
+            allFlow += len(loadingPaths)
+            allBendings += totalBendings
+            allLengths += totalPathLength
+        
+        print('K', allFlow, 'B', allBendings, 'L', allLengths)
+    """
+
+
 def getPlacementAndTimestamp(root):
     '''
         Generate the tree from the list provided
@@ -432,7 +514,7 @@ def getPlacementAndTimestamp(root):
 
     # Get the corrospondence mixture reagents and intermediate fluids
     mixture = getMix(ntmroot)
-    print(mixture)
+    # print(mixture)
 
     # Assignment of all the internal node in biochip
     assignment = {}
@@ -446,10 +528,13 @@ def getPlacementAndTimestamp(root):
             else:
                 timeStamp[item[1]].append(item[0])
 
-    for key in assignment:
-        print(key, assignment[key])
-    for t in timeStamp:
-        print(t, timeStamp[t])
+    # for key in assignment:
+    #     print(key, assignment[key])
+    # for t in timeStamp:
+    #     print(t, timeStamp[t])
+
+    KBL(assignment, mixture, timeStamp)
+
 
 
 def floSPA(root, ratioList, factorList, name):
@@ -484,6 +569,7 @@ def floSPA(root, ratioList, factorList, name):
     # create tree from the dot file
     newroot = PT.getRoot("skeletonTreeAfterAnnotation.dot")
     getPlacementAndTimestamp(newroot)
+
 
 def skeletonTreeGeneration(ratioList, factorList):
 

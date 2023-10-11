@@ -1,10 +1,10 @@
-from .LAFCA import *
-from .DFL import *
+import LAFCA
+import DFL
 import itertools
 
-global blockagesPos
-v = -1
 blockagesPos = []
+v = -1
+
 
 def demo(loadingCells):
     for element in itertools.product(*loadingCells):
@@ -37,11 +37,11 @@ def goAndFind(ind, blockageSpecificCells, cells, p):
         cells.pop()
 
 
-def getPlacementAndLoading(loadingCells, blockageCoordinates, reagentList, units):
+def getPlacementAndLoading(loadingCells, blockageCoordinates, reagentList):
     '''
         Intermediate fluids are considered as blockages
     '''
-    row, col = 10, 10
+    row, col = 15, 15
     grid = []
     # Make the grid
     for _ in range(row):
@@ -60,7 +60,7 @@ def getPlacementAndLoading(loadingCells, blockageCoordinates, reagentList, units
     for i, reagents in enumerate(reagentList):
         blockages = []
         for reagent in reagents:
-            if reagent[0] == 'M':
+            if reagent[0] != 'R':
                 blockages.append(reagent)
         for blockage in blockages:
             reagents.remove(blockage)
@@ -72,15 +72,16 @@ def getPlacementAndLoading(loadingCells, blockageCoordinates, reagentList, units
     blockageOrder = [] # contains blockage order and the mixture index
     for i, blockages in enumerate(blockageList):
         for blockage in blockages:
-            if len(blockageCoordinates[i][blockage]) == units[i][blockage]:
+            if len(blockageCoordinates[i][blockage]) == 1:
                 # Place the blockage in the corrosponding cell and remove the cell from loading cell and blockageList
-                for cell in blockageCoordinates[i][blockage]:
-                    grid[cell[0]][cell[1]] = blockage
-                    loadingCells[i].remove(cell)
+                cell = blockageCoordinates[i][blockage][0]
+                grid[cell[0]][cell[1]] = blockage
+
+                loadingCells[i].remove(cell)
             
             else:
                 blockageSpecificCells.append(blockageCoordinates[i][blockage])
-                blockageOrder.append([blockage, i])
+                blockageOrder.append([blockage, i]) 
 
 
     goAndFind(0, blockageSpecificCells, [], 0)
@@ -119,7 +120,7 @@ def getPlacementAndLoading(loadingCells, blockageCoordinates, reagentList, units
 
     # # Used LAFCA to place the reagents in each cell
     for i in range(len(loadingCells)):
-        assignment = createFile(reagentList[i], loadingCells[i], 'z3File.py', 'output'+str(i)+'.txt')
+        assignment = LAFCA.createFile(reagentList[i], loadingCells[i], 'z3File.py', 'output'+str(i)+'.txt')
         for reagent in assignment:
             for j in range(len(assignment[reagent])):
                 # Updating the grid
@@ -136,6 +137,8 @@ def getPlacementAndLoading(loadingCells, blockageCoordinates, reagentList, units
     
     global v
     v = -1
+    global blockagesPos
+    blockagesPos = []
 
     return loadingPaths
 
