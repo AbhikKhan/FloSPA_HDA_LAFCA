@@ -1,6 +1,8 @@
 import subprocess
 import networkx as nx
 from collections import deque
+import pandas as pd
+from openpyxl import load_workbook
 
 import PathWayTree as PWT
 from showImages import *
@@ -346,7 +348,7 @@ def annotateMixingTreeWithValue(G,ipFileName):
             G[x][y]['edgeVar'][1] = varDict[edgeVar]
 
 
-def printTreeAfterAnnotation(G,filename):   
+def printTreeAfterAnnotation(G, filename):   
     # Generate dot file after annotating tree with SAT output 
     fp = open(filename,'w')
     string = 'digraph "DD" { \n' + "graph [ ordering = \"out\"];\n" 
@@ -387,14 +389,12 @@ def getInputRatio(ratioList):
     
     return input_ratio
 
-
 def getName(ratioList):
     name = ''
     for ratio in ratioList:
         name += str(ratio) + '_'
     
     return name[:-1]
-
 
 def getMix(root):
     '''
@@ -433,22 +433,29 @@ def boundingbox(assignments):
     area = (x_max - x_min + 1) * (y_max - y_min + 1)
     return area
             
-
-def KBL(mixtures, assignment, timestamp):
+def KBL(assignment, mixtures, timestamp):
     '''
         Returns KBL information of a mixing tree
     '''
+    allFlow, allBendings, allLengths = 0, 0, 0
+    row, col = 10, 10
+    grid = []
+    for _ in range(row):
+        grid.append(['*']*col)
     # Get the parallel loading cells in each time stamp
     for t in timestamp:
-        parallelLoading = timestamp[t][:]
-        loadingCells = []
-        reagentList = []
-        blockageList = []
-        units = []
-        for mix in parallelLoading: # Mi Mj etc
-            loadingCells.append(assignment[mix])
-            reagentList.append(mixtures[mix])
-            
+        # Make the grid
+        Mixtures = dict()
+        loadingCells = dict() # Cells that participate in mixing at current timestamp
+        reagentList = dict() # List of reagents used in mixture M1
+        blockageList = dict() # List of intermediate fluids in each mixture
+        units = dict() # Units of intermediate fluids needed in mixtures
+
+        print("timestamp", t)
+        for mix in timestamp[t]: # Mi Mj etc
+            Mixtures[mix] = assignment[mix][:]
+            loadingCells[mix] = assignment[mix][:]
+            reagents = []
             blockage = dict() # Store blockage list for each mixture Mi
             unit = dict() # Store units of intermediate fluids required
             for reagent in mixtures[mix]:
@@ -456,65 +463,36 @@ def KBL(mixtures, assignment, timestamp):
                     if reagent not in blockage:
                         blockage[reagent] = []
                         unit[reagent] = 1
-                        for cell in assignment[mix]:
-                            if cell in assignment[reagent]:
+                        for cell in assignment[reagent]:
+                            if cell in assignment[mix]:
                                 blockage[reagent].append(cell)
+                            else:
+                                grid[cell[0]][cell[1]] = '*' # Washing
                     else:
                         unit[reagent] += 1
-            blockageList.append(blockage)
-            units.append(unit)
+                else:
+                    reagents.append(reagent)
+            # Reagents are in reagents
+            reagentList[mix] = reagents #list
+            # Blockages are in blockage and their positions
+            blockageList[mix] = blockage #dict
+            # Intermediate fluid units are stored in units
+            units[mix] = unit #dict
 
-        print(loadingCells)
-        print(blockageList)
-        print(reagentList)
-        loadingPaths = getPlacementAndLoading(loadingCells, blockageList, reagentList, units)
-        print(loadingPaths)
-    """
-        allFlow, allBendings, allLengths = 0, 0, 0
-        for parallelMixtures in rs:
-            parallelLoadingCells = []
-            reagents = []
-            blockageList = [] # stores all the blockages and the coordinates in which they can be placed.
-            '''
-                As only one unit is being shared between parent and child so there is no need to keep track of
-                number of same blockages as only one blockage of a particular kind will be taken into consideration.
-            '''
-
-            for mix in parallelMixtures:
-                mixture = [[element - 1 for element in sublist] for sublist in coordinates[mix][:]]
-                parallelLoadingCells.append(mixture[:])
-
-                # Child information to place blockages
-                blockages = dict()
-                if mix in adj_list:
-                    for child in adj_list[mix]:
-                        for cell in coordinates[child]:
-                            if cell in coordinates[mix]:
-                                interFluid = 'M'+str(child)
-                                if interFluid not in blockages: # Check wheather the blockage is present in the list or not
-                                    blockages[interFluid] = [[x-1 for x in cell]]
-                                else:
-                                    blockages[interFluid].append([x-1 for x in cell])
-                    blockageList.append(blockages)
-
-                # Get all the reagents for the current mixture
-                reagents.append(mix_u[mix])
-
-            totalPathLength, totalBendings = 0, 0
-            loadingPaths = lafca.getPlacementAndLoading(parallelLoadingCells, blockageList, reagents)
-            for order in loadingPaths:
-                totalBendings += order[1]
-                totalPathLength += len(order[2])
-                print(order[0], 'Bendings:', order[1], 'Path Length:', len(order[2]))
-            
-            print('Flow:', len(loadingPaths), ',Total Bendings:', totalBendings, ',Total Path Length:', totalPathLength)
-            allFlow += len(loadingPaths)
-            allBendings += totalBendings
-            allLengths += totalPathLength
+        loadingPaths = getPlacementAndLoading(Mixtures, loadingCells, reagentList, blockageList, units, grid)
+        totalPathLength, totalBendings = 0, 0
+        for order in loadingPaths:
+            totalBendings += order[1]
+            totalPathLength += len(order[2])
+            print(order[0], 'Bendings:', order[1], 'Path Length:', len(order[2]))
         
-        print('K', allFlow, 'B', allBendings, 'L', allLengths)
-    """
-
+        print('Flow:', len(loadingPaths), ',Total Bendings:', totalBendings, ',Total Path Length:', totalPathLength)
+        allFlow += len(loadingPaths)
+        allBendings += totalBendings
+        allLengths += totalPathLength
+    
+    print('K', allFlow, 'B', allBendings, 'L', allLengths)
+    return allFlow, allBendings, allLengths
 
 def getPlacementAndTimestamp(root):
     '''
@@ -526,9 +504,8 @@ def getPlacementAndTimestamp(root):
 
     # Get the corrospondence mixture reagents and intermediate fluids
     mixture = getMix(ntmroot)
-    # print(mixture)
 
-    # Assignment of all the internal node in biochip
+    # Assignment of all the internal node
     assignment = {}
     # timestamp at which particular mixture is going to execute
     timeStamp = {}
@@ -540,15 +517,10 @@ def getPlacementAndTimestamp(root):
             else:
                 timeStamp[item[1]].append(item[0])
 
-    print("area ", boundingbox(assignment))
-    # for key in assignment:
-    #     print(key, assignment[key])
-    # for t in timeStamp:
-    #     print(t, timeStamp[t])
-
-    KBL(assignment, mixture, timeStamp)
-
-
+    area = boundingbox(assignment)
+    print("area ", area)
+    K, B, L = KBL(assignment, mixture, timeStamp)
+    return area, K, B, L
 
 def floSPA(root, ratioList, factorList, name):
     '''
@@ -581,7 +553,9 @@ def floSPA(root, ratioList, factorList, name):
 
     # create tree from the dot file
     newroot = PT.getRoot("skeletonTreeAfterAnnotation.dot")
-    getPlacementAndTimestamp(newroot)
+    A, K, B, L = getPlacementAndTimestamp(newroot)
+
+    return A, K, B, L
 
 
 def skeletonTreeGeneration(ratioList, factorList):
@@ -591,26 +565,54 @@ def skeletonTreeGeneration(ratioList, factorList):
 
     root0 = genMix(input_ratio, 4)
     root1 = hda(root0)
-    saveTree(root0, f'./outputGenmix/{name}_0.png')
-    saveTree(root1, f'./outputGenmix/{name}_1.png')
+    saveTree(root0, f'./outputGenmix/{name}_0.png', 'GenMix')
+    saveTree(root1, f'./outputGenmix/{name}_1.png', 'GenMix+HDA')
     save_images_side_by_side(f'./outputGenmix/{name}_0.png', f'./outputGenmix/{name}_1.png', f'./compiledGenmix/{name}.png')
 
-    floSPA(root0, ratioList, factorList, f'./outputFloSPA/{name}_0.png')
-    floSPA(root1, ratioList, factorList, f'./outputFloSPA/{name}_1.png')
+    Agf, Kgf, Bgf, Lgf = floSPA(root0, ratioList, factorList, f'./outputFloSPA/{name}_0.png')
+    Aghf, Kghf, Bghf, Lghf = floSPA(root1, ratioList, factorList, f'./outputFloSPA/{name}_1.png')
+    # print(ratioList, Agf, Kgf, Bgf, Lgf, Aghf, Kghf, Bghf, Lghf)
+    # save the data
+
+    # data = [{'Ratio':ratioList, 
+    #          'Area (G+F)':Agf , 'K (G+F)': Kgf, 'B (G+F)': Bgf, 'L (G+F)': Lgf,
+    #          'Area (G+H+F)':Aghf , 'K (G+H+F)': Kghf, 'B (G+H+F)': Bghf, 'L (G+H+F)': Lghf}]
+    # file_path = 'results.xlsx'
+    
+    # column_order = [{'Ratio', 
+    #          'Area (G+F)', 'K (G+F)', 'B (G+F)', 'L (G+F)',
+    #          'Area (G+H+F)', 'K (G+H+F)', 'B (G+H+F)', 'L (G+H+F)'}]
+    # df = pd.DataFrame(data, columns=column_order)
+    
+    # # Load the existing Excel file
+    # book = load_workbook(file_path)
+    # writer = pd.ExcelWriter(file_path, engine='openpyxl') 
+    # writer.book = book
+    # sheet_name = 'Sheet1'  # Change to the desired sheet name
+    # try:
+    #     writer.sheets = {ws.title: ws for ws in book.worksheets}
+    #     df.to_excel(writer, sheet_name=sheet_name, index=False, header=False, startrow=writer.sheets[sheet_name].max_row)
+    # except KeyError:
+    #     df.to_excel(writer, sheet_name=sheet_name, index=False)
+    
+    # # Save the changes
+    # writer.save()
+    # writer.close()
 
     save_images_side_by_side(f'./outputFloSPA/{name}_0.png', f'./outputFloSPA/{name}_1.png', f'./compiledFloSPA/{name}.png')
 
 
 if __name__ == '__main__':
+    ind = [0, 2, 5, 7, 19, 22, 36, 62]
     ratioLists = [
-        [89, 33, 49, 85],
+        [89, 33, 49, 85], #
         [68, 10, 118, 60],
-        [11, 166, 29, 50],
+        [11, 166, 29, 50], #
         [9, 10, 25, 212],
         [120, 24, 65, 47],
-        [4, 109, 25, 118],
+        [4, 109, 25, 118], #
         [56, 17, 140, 43],
-        [118, 37, 37, 64],
+        [118, 37, 37, 64], #
         [8, 9, 145, 94],
         [159, 30, 60, 7],
         [128, 46, 23, 59],
@@ -622,10 +624,10 @@ if __name__ == '__main__':
         [117, 56, 33, 50],
         [117, 97, 8, 34],
         [44, 68, 75, 69],
-        [9, 23, 14, 210],
+        [9, 23, 14, 210], #
         [48, 35, 159, 14],
         [10, 20, 164, 62],
-        [38, 204, 12, 2],
+        [38, 204, 12, 2], #
         [86, 25, 22, 123],
         [47, 22, 110, 77],
         [82, 56, 115, 3],
@@ -639,7 +641,7 @@ if __name__ == '__main__':
         [80, 6, 116, 54],
         [87, 76, 45, 48],
         [54, 112, 7, 83],
-        [108, 54, 2, 92],
+        [108, 54, 2, 92], #
         [51, 134, 28, 43],
         [14, 31, 174, 37],
         [135, 97, 18, 6],
@@ -665,7 +667,7 @@ if __name__ == '__main__':
         [4, 64, 138, 50],
         [59, 55, 70, 72],
         [22, 151, 11, 72],
-        [60, 66, 67, 63],
+        [60, 66, 67, 63], #
         [81, 130, 4, 41],
         [40, 17, 197, 2],
         [94, 107, 27, 28],
@@ -804,9 +806,9 @@ if __name__ == '__main__':
         [4,4,4,4],
         [4,4,4,4],
     ]
-    # for i in range(len(ratioLists)):
+    # for i in ind:
     #     print(ratioLists[i])
     #     skeletonTreeGeneration(ratioLists[i], factorLists[i])
 
-    print(ratioLists[10])
-    skeletonTreeGeneration(ratioLists[10], factorLists[10])
+    print(ratioLists[19])
+    skeletonTreeGeneration(ratioLists[19], factorLists[19])

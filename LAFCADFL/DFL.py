@@ -1,7 +1,7 @@
 from collections import deque
 
-row = 15
-col = 15
+row = 10
+col = 10
 
 
 def findStart(curr, grid, reagent, inlet):

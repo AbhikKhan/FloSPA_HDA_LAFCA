@@ -116,7 +116,7 @@ def viewTree(root):
 
 import os
 from .utility import create_directory
-def saveTree(root, save):
+def saveTree(root, save, name):
     save = save.split('/')
     dir_name = '/'.join(save[:-1])
     if not save[-1].endswith('.png'):
@@ -128,7 +128,7 @@ def saveTree(root, save):
     # plt.savefig(os.path.join(dir_name, file_name), #dpi = 128,
     #             bbox_inches = 'tight', pad_inches = 0)
 
-    _createTree(root).write_png(os.path.join(dir_name, file_name))
+    _createTree(root, name).write_png(os.path.join(dir_name, file_name))
 
 ######################################################################################
 def listToSkewTree(combination):
