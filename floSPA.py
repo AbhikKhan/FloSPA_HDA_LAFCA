@@ -3,6 +3,7 @@ import networkx as nx
 from collections import deque
 import pandas as pd
 from openpyxl import load_workbook
+import csv
 
 import PathWayTree as PWT
 from showImages import *
@@ -440,6 +441,13 @@ def KBL(assignment, mixtures, timestamp):
     allFlow, allBendings, allLengths = 0, 0, 0
     row, col = 10, 10
     grid = []
+    parent = dict() # Stores parent coordinates
+    for mix in mixtures:
+        for reagent in mixtures[mix]:
+            if reagent[0] == 'M':
+                if reagent not in parent:
+                    parent[reagent] = assignment[mix][:]
+    parent['M0'] = assignment['M0'][:]
     for _ in range(row):
         grid.append(['*']*col)
     # Get the parallel loading cells in each time stamp
@@ -479,7 +487,7 @@ def KBL(assignment, mixtures, timestamp):
             # Intermediate fluid units are stored in units
             units[mix] = unit #dict
 
-        loadingPaths = getPlacementAndLoading(Mixtures, loadingCells, reagentList, blockageList, units, grid)
+        loadingPaths = getPlacementAndLoading(Mixtures, parent, loadingCells, reagentList, blockageList, units, grid)
         totalPathLength, totalBendings = 0, 0
         for order in loadingPaths:
             totalBendings += order[1]
@@ -557,7 +565,6 @@ def floSPA(root, ratioList, factorList, name):
 
     return A, K, B, L
 
-
 def skeletonTreeGeneration(ratioList, factorList):
 
     input_ratio = getInputRatio(ratioList)
@@ -571,39 +578,32 @@ def skeletonTreeGeneration(ratioList, factorList):
 
     Agf, Kgf, Bgf, Lgf = floSPA(root0, ratioList, factorList, f'./outputFloSPA/{name}_0.png')
     Aghf, Kghf, Bghf, Lghf = floSPA(root1, ratioList, factorList, f'./outputFloSPA/{name}_1.png')
-    # print(ratioList, Agf, Kgf, Bgf, Lgf, Aghf, Kghf, Bghf, Lghf)
+    
     # save the data
-
-    # data = [{'Ratio':ratioList, 
-    #          'Area (G+F)':Agf , 'K (G+F)': Kgf, 'B (G+F)': Bgf, 'L (G+F)': Lgf,
-    #          'Area (G+H+F)':Aghf , 'K (G+H+F)': Kghf, 'B (G+H+F)': Bghf, 'L (G+H+F)': Lghf}]
-    # file_path = 'results.xlsx'
+    file_path = 'results.xlsx'
     
-    # column_order = [{'Ratio', 
-    #          'Area (G+F)', 'K (G+F)', 'B (G+F)', 'L (G+F)',
-    #          'Area (G+H+F)', 'K (G+H+F)', 'B (G+H+F)', 'L (G+H+F)'}]
-    # df = pd.DataFrame(data, columns=column_order)
-    
-    # # Load the existing Excel file
-    # book = load_workbook(file_path)
-    # writer = pd.ExcelWriter(file_path, engine='openpyxl') 
-    # writer.book = book
-    # sheet_name = 'Sheet1'  # Change to the desired sheet name
-    # try:
-    #     writer.sheets = {ws.title: ws for ws in book.worksheets}
-    #     df.to_excel(writer, sheet_name=sheet_name, index=False, header=False, startrow=writer.sheets[sheet_name].max_row)
-    # except KeyError:
-    #     df.to_excel(writer, sheet_name=sheet_name, index=False)
-    
-    # # Save the changes
-    # writer.save()
-    # writer.close()
+    file = open(file_path, 'a+')
+    file = csv.writer(file)
+    file.writerow([ratioList, Agf ,Kgf, Bgf, Lgf, Aghf ,Kghf, Bghf, Lghf])
 
     save_images_side_by_side(f'./outputFloSPA/{name}_0.png', f'./outputFloSPA/{name}_1.png', f'./compiledFloSPA/{name}.png')
 
 
 if __name__ == '__main__':
-    ind = [0, 2, 5, 7, 19, 22, 36, 62]
+    real = [
+        [19, 15, 15, 15],
+        [56, 113, 87],
+        [102, 26, 2, 2, 124],
+        [67, 38, 3, 67, 14, 67],
+        [180, 26, 26, 5, 5, 4],
+    ]
+    fact = [
+        [4, 4, 4],
+        [4, 4, 4, 4],
+        [4, 4, 4, 4, 4],
+        [4, 4, 4, 4, 4, 4],
+        [4, 4, 4, 4, 4, 4]
+    ]
     ratioLists = [
         [89, 33, 49, 85], #
         [68, 10, 118, 60],
@@ -806,9 +806,7 @@ if __name__ == '__main__':
         [4,4,4,4],
         [4,4,4,4],
     ]
-    # for i in ind:
-    #     print(ratioLists[i])
-    #     skeletonTreeGeneration(ratioLists[i], factorLists[i])
-
-    print(ratioLists[19])
-    skeletonTreeGeneration(ratioLists[19], factorLists[19])
+    for i in range(2):
+        print(real[i])
+        skeletonTreeGeneration(real[i], fact[i])
+    # skeletonTreeGeneration([27, 25, 57, 69, 78], [4, 4, 4, 4, 4])

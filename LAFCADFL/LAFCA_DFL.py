@@ -41,7 +41,7 @@ def findBlockages(loadingCells, units, blockages):
         dfs(element[0], element, loadingCells, units, blockages, 0, [], [])
 
 
-def getPlacementAndLoading(Mixtures, loadingCells, reagentList, blockageList, units, grid):
+def getPlacementAndLoading(Mixtures, parentMix, loadingCells, reagentList, blockageList, units, grid):
     '''
         Intermediate fluids are considered as blockages
     '''
@@ -161,10 +161,10 @@ def getPlacementAndLoading(Mixtures, loadingCells, reagentList, blockageList, un
     print(Mixtures)
     # Need to make row and col as local variable that can be passed in DFL
     loadingPaths = DFL([0,9],[9,0],grid,allReagents,cellsToLoad)
-    
     for mix in Mixtures:
         for x, y in Mixtures[mix]:
-            grid[x][y] = mix
+            if [x, y] in parentMix[mix]:
+                grid[x][y] = mix
 
     for r in grid:
         print(r)
